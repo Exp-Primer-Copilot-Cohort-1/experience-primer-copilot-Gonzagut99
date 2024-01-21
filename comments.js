@@ -2,84 +2,50 @@
 var express = require('express');
 var app = express();
 var path = require('path');
+var fs = require('fs');
 var bodyParser = require('body-parser');
-var mysql = require('mysql');
-var connection = mysql.createConnection({
-	host: 'localhost',
-	user: 'root',
-	password: 'password',
-	database: 'comments'
-});
 
-//connect to mysql
-connection.connect(function(err){
-	if(err){
-		console.log('Error connecting to Db');
-		return;
-	}
-	console.log('Connection established');
-});
+// parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: false }))
 
-//use bodyParser
-app.use(bodyParser.urlencoded({extended: true}));
+app.use(express.static(path.join(__dirname, 'public')));
 
-//get all comments
-app.get('/', function(req, res){
-	res.sendFile(path.join(__dirname + '/index.html'));
+// parse application/json
+app.use(bodyParser.json())
+
+//create a new file if it doesn't exist
+var file = 'comments.json';
+if (!fs.existsSync(file)) {
+  fs.writeFile(file, '{"comments":[]}', function (err) {
+    if (err) throw err;
+    console.log('It\'s saved!');
+  });
+}
+
+//get comments
+app.get('/comments', function(req, res) {
+  fs.readFile(file, function(err, data) {
+    if(err) throw err;
+    res.send(data);
+  });
 });
 
 //post comments
-app.post('/', function(req, res){
-	var comment = {comment: req.body.comment};
-	connection.query('INSERT INTO comments SET ?', comment, function(err, result){
-		if(err) throw err;
-		console.log(result);
-	});
-	res.redirect('/');
-});
-
-//get all comments
-app.get('/getComments', function(req, res){
-	connection.query('SELECT * FROM comments', function(err, rows, fields){
-		if(err) throw err;
-		res.send(rows);
-	});
-});
-
-//delete comments
-app.delete('/deleteComments', function(req, res){
-	connection.query('DELETE FROM comments', function(err, rows, fields){
-		if(err) throw err;
-		res.send(rows);
-	});
-});
-
-//get one comment
-app.get('/getComments/:id', function(req, res){
-	connection.query('SELECT * FROM comments WHERE id = ?', [req.params.id], function(err, rows, fields){
-		if(err) throw err;
-		res.send(rows);
-	});
-});
-
-//delete one comment
-app.delete('/deleteComments/:id', function(req, res){
-	connection.query('DELETE FROM comments WHERE id = ?', [req.params.id], function(err, rows, fields){
-		if(err) throw err;
-		res.send(rows);
-	});
-});
-
-//update one comment
-app.put('/updateComments/:id', function(req, res){
-	connection.query('UPDATE comments SET comment = ? WHERE id = ?', [req.body.comment, req.params.id], function(err, rows, fields){
-		if(err) throw err;
-		res.send(rows);
-	});
+app.post('/comments', function(req, res) {
+  fs.readFile(file, function(err, data) {
+    if(err) throw err;
+    var obj = JSON.parse(data);
+    obj.comments.push(req.body);
+    fs.writeFile(file, JSON.stringify(obj), function(err) {
+      if(err) throw err;
+      res.send(JSON.stringify(obj));
+    });
+  });
 });
 
 //start server
-app.listen(8080);
-console.log('Server started on port 8080');
+var server = app.listen(3000, function() {
+  console.log('Listening on port %d', server.address().port);
+});
 
 
